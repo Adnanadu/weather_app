@@ -20,37 +20,51 @@ class _WeatherPageState extends State<WeatherPage> {
 
   ///fetch weather
   void fetchWeather() async {
-    ///get current city
-    String cityName = await weatherService.getCurrentCity();
-
-    ///get weather city
     try {
+      String cityName = await weatherService.getCurrentCity();
       WeatherModel weather = await weatherService.getWeather(cityName);
       setState(() {
         weatherModel = weather;
       });
     } catch (e) {
       log(e.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () {
+                fetchWeather();
+              },
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
   ///weather animation
   String getWeatherAnimations(String? mainCondition) {
-    switch (mainCondition) {
-      case 'Clouds':
+    if (mainCondition == null) return 'assets/animations/sunny.json';
+    switch (mainCondition.toLowerCase()) {
+      case 'clouds':
       case 'mist':
       case 'smoke':
       case 'haze':
       case 'dust':
       case 'fog':
         return 'assets/animations/cloud.json';
-      case 'Rain':
+      case 'rain':
       case 'drizzle':
         return 'assets/animations/rain.json';
       case 'shower rain':
       case 'thunderstorm':
         return 'assets/animations/rain_with_thunder.json';
-      case 'Clear':
+      case 'clear': // changed from 'Clear' to lowercase
         return 'assets/animations/sunny.json';
       case '':
         return 'assets/animations/sunny.json';
@@ -70,37 +84,55 @@ class _WeatherPageState extends State<WeatherPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.grey),
+            onPressed: fetchWeather,
+          ),
+        ],
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             //city name
             Column(
-              spacing: 10,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                // removed const
                 Icon(
                   Icons.location_on,
                   color: Colors.grey,
                   size: 30,
                 ),
-                Text(weatherModel?.cityName ?? 'Loading City...!',
-                    style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey)),
+                Text(
+                  weatherModel?.cityName ?? 'Loading City...!',
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
               ],
             ),
 
             //animations
-            Lottie.asset(getWeatherAnimations(weatherModel?.mainContinion)),
+            Lottie.asset(getWeatherAnimations(weatherModel?.mainCondition)),
 
             ///temperature
             Text(
-              "${weatherModel?.temperature} °C",
-              style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey),
+              weatherModel?.temperature != null
+                  ? "${weatherModel!.temperature.toStringAsFixed(1)} °C"
+                  : "-- °C",
+              style: const TextStyle(
+                // added const
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),

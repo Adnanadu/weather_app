@@ -10,13 +10,30 @@ class WeatherService {
   final String apiKey;
   WeatherService(this.apiKey);
   Future<WeatherModel> getWeather(String cityName) async {
-    final response = await http
-        .get(Uri.parse('$baseUrl?q=$cityName&appid=$apiKey&units=metric'));
+    try {
+      // Encode the city name to handle spaces and special characters
+      final encodedCity = Uri.encodeComponent(cityName.trim());
+      final url = '$baseUrl?q=$encodedCity&appid=$apiKey&units=metric';
 
-    if (response.statusCode == 200) {
-      return WeatherModel.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Error fetching weather');
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return WeatherModel.fromJson(jsonDecode(response.body));
+      } else if (response.statusCode == 400) {
+        throw Exception('Invalid request. Please check city name format');
+      } else if (response.statusCode == 404) {
+        throw Exception('City not found: $cityName');
+      } else if (response.statusCode == 401) {
+        throw Exception('Invalid API key');
+      } else {
+        throw Exception(
+            'Failed to load weather data. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is FormatException) {
+        throw Exception('Invalid response format from weather service');
+      }
+      throw Exception('Failed to connect to weather service: ${e.toString()}');
     }
   }
 
@@ -46,17 +63,21 @@ class WeatherService {
 
     /// Get the current position
     Position position = await Geolocator.getCurrentPosition(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 100,
-      ),
-    );
+        locationSettings: LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 100,
+      timeLimit: Duration(seconds: 10),
+    ));
 
     List<Placemark> placemarks = await placemarkFromCoordinates(
       position.latitude,
       position.longitude,
     );
     String? city = placemarks[0].locality;
-    return city ?? "";
+    if (city == null || city.isEmpty) {
+      // Fallback to administrative area if locality is not available
+      city = placemarks[0].administrativeArea;
+    }
+    return city ?? "London"; // Fallback to a default city if no location found
   }
 }
